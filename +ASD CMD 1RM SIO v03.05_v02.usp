@@ -1,0 +1,892 @@
+//
+//			* * * * * * * ====================
+//			 * * * * * *  ====================
+//			* * * * * * * ====================				ASD NVX COMMAND CONTROLLER v1
+//			 * * * * * *  ====================					ANALOG SERIAL DIGITAL NVX COMMAND CONTROLLER
+//			* * * * * * * ====================						MADE IN THE U.S.A.
+//			==================================							2023
+//			==================================           
+//			==================================
+//
+//        ___     ________     ________     ________      ________     ________     
+//       |\  \   |\   ____\   |\   __  \   |\   ___  \   |\_____  \   |\   __  \    
+//       \ \  \  \ \  \___|   \ \  \|\  \  \ \  \\ \  \   \|___/  /|  \ \  \|\  \   
+//     __ \ \  \  \ \  \  ___  \ \  \\\  \  \ \  \\ \  \      /  / /   \ \  \\\  \       __
+//    |\  \\_\  \  \ \  \|\  \  \ \  \\\  \  \ \  \\ \  \    /  /_/__   \ \  \\\  \    <(o )___
+//    \ \________\  \ \_______\  \ \_______\  \ \__\\ \__\  |\________\  \ \_______\    ( ._> /
+//     \|__1776__|   \|_______|   \|_______|   \|__| \|__|   \|_______|   \|_______|     `---' 
+//
+//
+// -- CODE INFORMATION ------------------------------------------------------------------------------------------- //
+//
+//	PROGRAMMER:			JGonzo
+//	RELEASE DATE:		
+//	RELEASE VERSION:	
+//  MODULE DEFINITION:	
+//
+// -- END SECTION ------------------------------------------------------------------------------------------------ //
+
+// -- UPDATES ---------------------------------------------------------------------------------------------------- //
+//
+//	JGonzo - 07/07/23 - MODULE CREATION
+//	JGonzo - 07/07/23 - CHANGED IO FROM 500 TO 600 AND 12 TOUCH PANELS TO 13
+//
+// -- END SECTION ------------------------------------------------------------------------------------------------ //
+
+// -- COMPILER DIRECTIVES ---------------------------------------------------------------------------------------- //
+
+#ENABLE_DYNAMIC
+#DEFAULT_NONVOLATILE
+#ENABLE_STACK_CHECKING
+#LARGE_STACK
+#ENABLE_TRACE
+#CATEGORY "46" "SIMPL+ ASD Cross Control" // CUSTOM
+
+// -- END SECTION ------------------------------------------------------------------------------------------------ //
+
+// -- CONSTANTS -------------------------------------------------------------------------------------------------- //
+
+#DEFINE_CONSTANT    numTOUCHPANELS 10
+#DEFINE_CONSTANT    numENCLAVES 3
+#DEFINE_CONSTANT    maxIO 550
+#DEFINE_CONSTANT    sumPRESETS 24
+#DEFINE_CONSTANT    numPRESETPARAMS 10
+
+#DEFINE_CONSTANT	TRUE 1
+#DEFINE_CONSTANT	FALSE 0
+#DEFINE_CONSTANT	START 1
+#DEFINE_CONSTANT	STOP 0
+
+#DEFINE_CONSTANT    AUDRouteNORMAL 1111
+#DEFINE_CONSTANT    AUDRouteONLY 2222
+#DEFINE_CONSTANT    AUDRouteCLEAR 3333
+#DEFINE_CONSTANT    AUDRouteREMOVE 4444
+#DEFINE_CONSTANT    AUDRouteDNR 0
+#DEFINE_CONSTANT    VIDRouteDNR 8888
+
+// -- END SECTION ------------------------------------------------------------------------------------------------ //
+// -- DIGITAL / ANALOG / SERIAL I/O ------------------------------------------------------------------------------ //
+
+//NO ARRAYS
+DIGITAL_INPUT   BUILD, _SKIP_,
+                RM_Startup,
+                RM_Shutdown, _SKIP_,
+                RM_Sanitize,
+                RM_Restore,  _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_;
+
+ANALOG_INPUT    RM_Enclave, _SKIP_,
+                RM_Enclave_DEFAULT, _SKIP_,
+                RM_SIGNAGEVAL, _SKIP_,
+                SETPAUDSOURCEVAL, _SKIP_,
+                SetSwitchSize, _SKIP_;
+
+STRING_INPUT    RM_PresetKeyboardINtxt[100], _SKIP_,
+                routerCommandRX[255], _SKIP_;
+
+DIGITAL_OUTPUT  QUACK,
+                subQUACK, _SKIP_,
+                RM_Active,
+                RM_Idle, _SKIP_,
+                RM_SanitizeFB, _SKIP_,
+                ENCLAVECHANGEBUSY, _SKIP_,
+                RMERRORFB, _SKIP_;
+
+ANALOG_OUTPUT   RM_Enclave_FB, _SKIP_;
+
+STRING_OUTPUT   RM_PAudOutText$, _SKIP_,						// ROOM PROGRAM AUDIO TEXT
+                RM_PresetNameCurrentTXT, _SKIP_,
+				ERRORTXT, _SKIP_,
+                routerCommandTX, _SKIP_;
+
+//ARRAYS
+DIGITAL_INPUT   TP_PresetStore[numTOUCHPANELS], _SKIP_,
+                TP_PresetSavePress[numTOUCHPANELS], _SKIP_,
+                TP_PresetCancelPress[numTOUCHPANELS], _SKIP_,
+                TP_DestinationPress[numTOUCHPANELS], _SKIP_, 
+                TP_ProgramAudioPress[numTOUCHPANELS], _SKIP_,
+                TP_DestinationPreviewEnable[numTOUCHPANELS], _SKIP_,
+				TP_DestinationPreviewDisable[numTOUCHPANELS], _SKIP_,
+                TP_SourcePreviewEnable[numTOUCHPANELS], _SKIP_,
+				TP_SourcePreviewDisable[numTOUCHPANELS], _SKIP_,
+                AFollowV[maxIO], _SKIP_,
+				AFollowS[maxIO], _SKIP_,
+                OutputEnable[maxIO], _SKIP_;
+
+ANALOG_INPUT	TP_PresetRecall[numTOUCHPANELS], _SKIP_,
+                TP_SelectedDestination[numTOUCHPANELS], _SKIP_,
+				TP_SelectedSource[numTOUCHPANELS], _SKIP_,
+				TP_DGEtoDMVal[numTOUCHPANELS], _SKIP_,				// TP DGE OUTPUT TO DM INPUT
+				TP_DMtoDGEVal[numTOUCHPANELS], _SKIP_,				// TP DM OUTPUT TO DGE INPUT
+				TP_DMtoGLASSVal[numTOUCHPANELS], _SKIP_,				// DM OUTPUT THAT CONNECTS TO THE GLASS THAT SHOWS  DGE
+				TPPanelType[numTOUCHPANELS], _SKIP_,
+				DESTSOURCEVALREP[maxIO], _SKIP_,
+				PresetParamIN[numPRESETPARAMS], _SKIP_;
+
+STRING_INPUT    INSourceTXT[maxIO][100], _SKIP_;
+
+DIGITAL_OUTPUT	TP_StorePresetFB[numTOUCHPANELS], _SKIP_,
+                TP_PresetsKeyboardON[numTOUCHPANELS], _SKIP_,
+				TP_PresetsKeyboardOFF[numTOUCHPANELS], _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_,
+                TP_PreviewAllowed_fb[numTOUCHPANELS], _SKIP_,
+                TP_DestinationPreviewActive[numTOUCHPANELS], _skip_,
+				TP_DestinationPreviewInactive[numTOUCHPANELS], _SKIP_,
+                TP_SourcePreviewActive[numTOUCHPANELS], _SKIP_,
+				TP_SourcePreviewInactive[numTOUCHPANELS], _SKIP_;
+
+ANALOG_OUTPUT   PresetParamOUT[numPRESETPARAMS], _SKIP_;
+
+STRING_OUTPUT   OUTSourceTXT[maxIO], _SKIP_,
+                PresetNameTXT[sumPRESETS,sumPRESETS], _SKIP_;
+
+// -- END SECTION  --------------------------------------------------------------------------------------------------------------------- //
+
+// -- GLOBAL VARIABLES ----------------------------------------------------------------------------------------------------------------- //
+
+INTEGER ENABLE;
+INTEGER PRESETINDEX;
+INTEGER RMPRESETTOG;
+INTEGER RMPRESETSTORETOG;
+INTEGER RMPRESETRECALL;
+INTEGER TPSPSTATE[numTOUCHPANELS];
+INTEGER TPDPSTATE[numTOUCHPANELS];
+SIGNED_INTEGER nFileHandle;
+SIGNED_INTEGER nTotalBytesWritten;
+
+// -- END SECTION  --------------------------------------------------------------------------------------------------------------------- //
+
+// -- STRUCTURES ----------------------------------------------------------------------------------------------------------------------- //
+
+STRUCTURE roomStruct{
+	INTEGER ENCLAVE;
+	INTEGER SANITIZE;
+    INTEGER MODE;
+    INTEGER AUDSOURCE;
+    STRING sPAUDSRCTEXT[50];
+};
+roomStruct ROOM;
+
+STRUCTURE destinationStruct{
+	INTEGER ROOMASSIGN;
+    INTEGER USE;
+	INTEGER SOURCE;
+	INTEGER ISGLASS;
+    INTEGER ISDMTODGE;
+    STRING  SOURCETEXT[50];
+};
+destinationStruct DESTINATION[550];
+
+STRUCTURE tpConfigurationStruct{
+	INTEGER ISDGE;
+	INTEGER TPTYPE;
+	INTEGER PREVIEWALLOW;
+	INTEGER DGETODM;
+	INTEGER DMTODGE;
+	INTEGER DMTOGLASS;
+    INTEGER REMANNDEV;
+};
+tpConfigurationStruct TPCONFIG[10];
+
+STRUCTURE presetsStruct{
+    INTEGER PAUDSRC;
+    INTEGER PMATRIX[550];
+	STRING sNAME[50];
+    STRING sPARAM[11][5];
+    STRING sPAUDTEXT[50];
+};
+presetsStruct PSTRUCT[24];
+
+STRUCTURE systemStruct{
+	INTEGER DMSIZE;
+};
+systemStruct SYS;
+
+// -- END SECTION  --------------------------------------------------------------------------------------------------------------------- //
+
+// -- FUNCTIONS ------------------------------------------------------------------------------------------------------------------------ //
+
+FUNCTION ERRORREPORT(INTEGER FNERR){
+	SWITCH (FNERR){
+		CASE(1):
+			ERRORTXT = "Unable to save preset, another room is currently saving their own.";
+		CASE(2):
+			ERRORTXT = "Unable to save preset, you cannot save routes that contain items belonging to other rooms.";
+		CASE(3):
+			ERRORTXT = "Destination currently being annotated.";
+		CASE(4):
+			ERRORTXT = "Destination currently being annotated.";
+		CASE(5):
+			ERRORTXT = "This room is already annotating on another touch panel.";
+		CASE(6):
+			ERRORTXT = "Recalling or saving presets not possible while annotation is active.";
+        CASE(7):
+            ERRORTXT = "You tried to annotate over no source, you cannot annotate a 0 source value.";
+		CASE(8):
+			ERRORTXT = "The Classification of the source is higher than the room the destination is assigned to.";
+		CASE(9):
+			ERRORTXT = "Correcting Detected Error - Destination Preview is already active on this touch panel. Please try again.";
+		CASE(10):
+			ERRORTXT = "Correcting Detected Error - Source Preview is already active on this touch panel. Please try again.";
+        CASE(11):
+			ERRORTXT = "Routing issue regarding the source or the destination. Please try again. If issue persists, contact support.";
+        CASE(12):
+            ERRORTXT = "Source Assignment Error - The assignment logic is set to IDLE. It must be in either ADD or REMOVE to continue.";
+    }
+	PULSE (300, RMERRORFB);	// MEANT TO PULSE A SPG FOR 3 SECONDS THAT DISPLAYS THE ERROR TEXT
+}
+FUNCTION AUDRoute(INTEGER FNSRC, STRING FNAUDTXT, INTEGER FNUPDATE){
+    STRING TEMPCOMMAND[50];
+    STRING TEMPSRC[4];
+    
+    TEMPSRC = ITOA(FNSRC);
+    RM_PAudOutText$ = FNAUDTXT;				    	// SENDS THE PRE-EVALUATED AUDIO TEXT
+    ROOM.AUDSOURCE = FNSRC;                         // SAVES THE ROUTED AUDIO INTO THE STRUCTURE
+    ROOM.sPAUDSRCTEXT = FNAUDTXT;
+
+    IF (FNUPDATE = FALSE){
+        MAKESTRING(TEMPCOMMAND, "AUDRTE:%s.", TEMPSRC);
+        routerCommandTX = TEMPCOMMAND;
+    }
+}
+FUNCTION AUDConfig(INTEGER FNSRC, INTEGER FNDEST, INTEGER FNRA, INTEGER FNUPDATE){
+	STRING	TEMPAUDTXT$[100];
+
+   	IF ((FNRA = AUDRouteNORMAL) || (FNRA = AUDRouteONLY)){  
+		IF (FNSRC > 0){
+			TEMPAUDTXT$ = INSourceTXT[FNSRC];
+		}      
+		ELSE IF (FNSRC = 0){
+			TEMPAUDTXT$ = "No Source";
+		}
+    }		
+	ELSE IF (FNRA = AUDRouteCLEAR){
+        TEMPAUDTXT$ = "Source Unrouted";
+    }
+    ELSE IF (FNRA = AUDRouteREMOVE){
+        TEMPAUDTXT$ = "Source Removed";
+    }
+
+	AUDRoute(FNSRC, TEMPAUDTXT$, FNUPDATE);
+}
+FUNCTION VIDRoute(INTEGER FNSRC, INTEGER FNDEST, INTEGER FNRA, INTEGER FNUPDATE){
+    STRING TEMPCOMMAND[100];
+    STRING sSOURCE[4];
+    STRING sDEST[4];
+
+	STRING TEMPSRCTXT$[100];
+    INTEGER TEMPSRC;
+    INTEGER TEMPSRCENC;
+	INTEGER BOOLNR;
+
+	BOOLNR = FNDEST;
+
+	IF (FNSRC != 0){		
+        TEMPSRC = FNSRC;
+        TEMPSRCTXT$ = INSourceTXT[TEMPSRC];
+        OUTSourceTXT[FNDEST] = TEMPSRCTXT$;
+        
+        IF (FNRA > 0){
+            IF (ROOM.AUDSOURCE != FNSRC){
+                AUDConfig(FNSRC, FNDEST, FNRA, 0);
+            }
+        }
+	}
+    ELSE IF (FNSRC = 0){
+        TEMPSRC = RM_SIGNAGEVAL;
+
+        IF (FNRA = AUDRouteCLEAR){
+            TEMPSRCTXT$ = "Source Unrouted";
+            OUTSourceTXT[FNDEST] = TEMPSRCTXT$;
+            AUDConfig(FNSRC, FNDEST, FNRA, 0);
+        }
+		IF (FNRA = AUDRouteREMOVE){
+            TEMPSRCTXT$ = "Source Removed";
+            OUTSourceTXT[FNDEST] = TEMPSRCTXT$;
+            AUDConfig(FNSRC, FNDEST, FNRA, 0);
+        }
+		IF (FNRA = AUDRouteDNR){
+            TEMPSRCTXT$ = "No Source";
+            OUTSourceTXT[FNDEST] = TEMPSRCTXT$;
+		}
+    }
+
+    DESTINATION[FNDEST].SOURCE = TEMPSRC;
+    DESTINATION[FNDEST].SOURCETEXT = TEMPSRCTXT$;
+    OUTSourceTXT[FNDEST] = TEMPSRCTXT$;
+
+    sSOURCE = ITOA(TEMPSRC);
+    sDEST = ITOA(FNDEST);
+
+    IF (FNUPDATE = FALSE){
+        MAKESTRING(TEMPCOMMAND, "VIDRTE:%s:%s.", sSOURCE, sDEST);
+        routerCommandTX = TEMPCOMMAND;
+    
+        IF (AFollowV[FNDEST]){
+            AUDRoute(FNSRC, TEMPSRCTXT$, 0);
+        }
+    }
+}
+FUNCTION SANIConfig(INTEGER FNM){
+	INTEGER TEMPDEST;
+	
+	IF (FNM = START){
+        ROOM.SANITIZE = TRUE;
+        RM_SanitizeFB = TRUE;        
+        routerCommandTX = "SANI:1.";
+	}
+	IF (FNM = STOP){
+		ROOM.SANITIZE = FALSE;
+		RM_SanitizeFB = FALSE;
+        routerCommandTX = "SANI:0.";		
+	}
+}
+FUNCTION ENCChange(INTEGER FNNE){
+	PULSE(300, ENCLAVECHANGEBUSY);
+
+	ROOM.ENCLAVE = FNNE;
+    RM_Enclave_FB = FNNE;
+}
+FUNCTION STRPreset(INTEGER FNTP){
+	INTEGER TEMPDEST;						// DESTINATION CHECK FOR LOOP
+	INTEGER TEMPSRC;						// SOURCE CHECK FOR LOOP
+	INTEGER TEMPPMX;
+	INTEGER TEMPX;
+	INTEGER FAIL;
+	INTEGER PASS;
+    STRING sTEMPMATRIX[14];
+    STRING sTEMPPARAM[14];
+	STRING sTEMPSRC[14];
+    STRING sPRESETINDEX[3];
+    INTEGER TOTALBYTES;
+    STRING TEMPCOMMAND[100];
+
+    sPRESETINDEX = ITOA(PRESETINDEX);    
+    MAKESTRING(TEMPCOMMAND, "PRESET:SAVE:%s.", sPRESETINDEX);
+    routerCommandTX = TEMPCOMMAND;    
+
+	TEMPSRC = ROOM.AUDSOURCE;
+    PSTRUCT[PRESETINDEX].sPAUDTEXT = ROOM.sPAUDSRCTEXT;
+    PSTRUCT[PRESETINDEX].PAUDSRC = TEMPSRC;
+
+    FOR (TEMPX = 1 TO 10){
+        sTEMPPARAM = ITOA(PresetParamIN[TEMPX]);
+        PSTRUCT[PRESETINDEX].sPARAM[TEMPX] = sTEMPPARAM;
+    }
+
+    FOR (TEMPDEST = 1 TO SYS.DMSIZE){
+		IF (DESTINATION[TEMPDEST].USE = TRUE){
+			PSTRUCT[PRESETINDEX].PMATRIX[TEMPDEST] = DESTINATION[TEMPDEST].SOURCE;
+		}
+	}
+
+	FAIL = 0;
+	PASS = 0;
+    TOTALBYTES = 0;
+
+	STARTFILEOPERATIONS();
+    nFileHandle = FileOpen("\\FILES\\Presets.bin", _o_WRONLY | _O_BINARY | _O_CREAT);
+    IF (nFileHandle >= 0){
+		FOR(TEMPX = 1 TO 24){
+	        WRITESTRUCTURE(nFileHandle, PSTRUCT[TEMPX], nTotalBytesWritten);
+	        IF(nTotalBytesWritten < 0){
+				FAIL = FAIL + 1;
+			}	
+	        ELSE{
+				PASS = PASS + 1;
+			}
+			nTotalBytesWritten = nTotalBytesWritten / 1024;
+            TOTALBYTES = TOTALBYTES + nTotalBytesWritten;
+		}
+    }
+	FileClose(nFileHandle);
+    ENDFILEOPERATIONS();
+}
+FUNCTION RECPreset(INTEGER FNPI, INTEGER FNTP){
+    INTEGER TEMPPVAL;
+	INTEGER TEMPX;
+    INTEGER TEMPY; 
+	INTEGER TEMPDEST;
+    INTEGER TEMPSRC;
+    STRING TEMPAUDTXT$[50];
+    STRING TEMPSRCTXT$[50];
+    STRING sPRESETINDEX[3];
+    STRING TEMPCOMMAND[100];
+
+	IF (RMPRESETTOG = TRUE){
+		PULSE(20, TP_PresetsKeyboardON[FNTP]);
+        RM_PresetNameCurrentTXT = PSTRUCT[FNPI].sNAME;
+	}
+	ELSE IF (RMPRESETTOG = FALSE){
+		RMPRESETRECALL = TRUE;
+
+        sPRESETINDEX = ITOA(FNPI);
+        MAKESTRING(TEMPCOMMAND, "PRESET:RECALL:%s.", sPRESETINDEX);
+        routerCommandTX = TEMPCOMMAND;
+        
+        TEMPAUDTXT$ = PSTRUCT[PRESETINDEX].sPAUDTEXT;
+        TEMPSRC = PSTRUCT[PRESETINDEX].PAUDSRC;
+        RM_PAudOutText$ = TEMPAUDTXT$;
+        ROOM.AUDSOURCE = TEMPSRC;
+
+        TEMPY = 1;
+        FOR (TEMPX = 1 TO 10){
+            TEMPPVAL = ATOI(PSTRUCT[FNPI].sPARAM[TEMPX]);
+            PresetParamOUT[TEMPY] = TEMPPVAL;
+            TEMPY = TEMPY + 1;
+        }
+        FOR (TEMPDEST = 1 TO SYS.DMSIZE){
+            IF (DESTINATION[TEMPDEST].USE = TRUE){
+                TEMPSRC = PSTRUCT[PRESETINDEX].PMATRIX[TEMPDEST];
+                IF (TEMPSRC = 0){
+                    TEMPSRCTXT$ = "No Source";
+                }
+                Else {
+                    TEMPSRCTXT$ = INSourceTXT[TEMPSRC];
+                }
+                DESTINATION[TEMPDEST].SOURCETEXT = TEMPSRCTXT$;
+                OUTSourceTXT[TEMPDEST] = TEMPSRCTXT$;
+            }
+        }
+				
+		RMPRESETRECALL = FALSE;
+	}
+}
+FUNCTION RMStartStop(INTEGER FNM){
+	INTEGER TEMPDEST;												// PLACEHOLDER FOR A FOR LOOP
+    INTEGER TEMPX;
+    INTEGER dENCLAVE;
+
+	RMPRESETRECALL = FALSE;
+    dENCLAVE = RM_Enclave_DEFAULT;
+
+    routerCommandTX = "STARTSTOP.";
+
+	AUDRoute(RM_SIGNAGEVAL, "NONE", 0);
+
+	IF (FNM = START){
+        RM_Active = TRUE;
+		RM_Idle = FALSE;
+
+        FOR (TEMPX = 1 TO sumPRESETS){
+            PresetNameTXT[TEMPX] = PSTRUCT[TEMPX].sNAME;
+        }		
+	}
+	ELSE IF (FNM = STOP){
+		RM_Active = FALSE;
+		RM_Idle = TRUE;
+
+		AUDConfig(0, VIDRouteDNR, AUDRouteONLY, 0);
+
+		IF (ROOM.ENCLAVE != dENCLAVE){
+			ENCChange(dENCLAVE);
+		}			
+	}
+}
+FUNCTION storeDefaults(){
+    INTEGER TEMPSRC;
+	INTEGER TEMPDEST;
+    INTEGER TEMPTP;
+	INTEGER TEMPX;
+    INTEGER FAIL;
+	INTEGER PASS;
+    INTEGER TOTALBYTES;  
+	INTEGER nTotalBytesRead;
+
+    STRING TEMPCMD[100];
+    STRING sSIGNAGE[4];
+    STRING sSRC[4];
+    STRING sDEST[4];
+
+	subQUACK = TRUE;
+
+	DELAY(500);
+
+    FAIL = 0;
+	PASS = 0;
+    TOTALBYTES = 0;
+
+    STARTFILEOPERATIONS();
+    nFileHandle = FileOpen("\\FILES\\Presets.bin", _o_RDONLY | _O_BINARY);
+    IF (nFileHandle < 0){
+        FOR (TEMPX = 1 TO 24){
+            IF (PSTRUCT[TEMPX].sNAME = ""){
+                PSTRUCT[TEMPX].sNAME = "Not Set";
+            }
+        }
+    }
+    ELSE IF (nFileHandle >= 0){
+        FOR(TEMPX = 1 TO sumPRESETS){
+            READSTRUCTURE(nFileHandle, PSTRUCT[TEMPX], nTotalBytesRead);
+            IF(nTotalBytesRead < 0){
+				FAIL = FAIL + 1;
+			}	
+	        ELSE{
+				PASS = PASS + 1;
+			}
+			nTotalBytesRead = nTotalBytesRead / 1024;
+            TOTALBYTES = TOTALBYTES + nTotalBytesRead;
+		}
+    }
+    FileClose(nFileHandle);
+    ENDFILEOPERATIONS();
+
+    SYS.DMSIZE = SetSwitchSize;
+    
+	FOR (TEMPTP = 1 TO numTOUCHPANELS){
+		TPCONFIG[TEMPTP].TPTYPE = TPPanelType[TEMPTP];
+		TPCONFIG[TEMPTP].DMTODGE = TP_DMtoDGEVal[TEMPTP];
+		TPCONFIG[TEMPTP].DGETODM = TP_DGEtoDMVal[TEMPTP];
+		TPSPSTATE[TEMPTP] = FALSE;
+		TPDPSTATE[TEMPTP] = FALSE;
+
+		IF (TPCONFIG[TEMPTP].TPTYPE > 0){
+			TP_PreviewAllowed_fb[TEMPTP] = TRUE;
+			TPCONFIG[TEMPTP].PREVIEWALLOW = TRUE;
+		}
+		ELSE IF (TPCONFIG[TEMPTP].TPTYPE = 0){
+			TP_PreviewAllowed_fb[TEMPTP] = FALSE;
+			TPCONFIG[TEMPTP].PREVIEWALLOW = FALSE;
+		}
+
+		TEMPDEST = TP_DMtoDGEVal[TEMPTP];
+
+		IF (TEMPDEST != 0){
+            DESTINATION[TEMPDEST].ISDMTODGE = TRUE;
+        }
+        ELSE IF (TEMPDEST = 0){
+            DESTINATION[TEMPDEST].ISDMTODGE = FALSE;
+        }
+
+		IF ((TP_DMtoGLASSVal[TEMPTP] >= 1) && (TP_DMtoGLASSVal[TEMPTP] <= maxIO)){
+			DESTINATION[TP_DMtoGLASSVal[TEMPTP]].ISGLASS = TRUE;
+            TPCONFIG[TEMPTP].DMTOGLASS = TP_DMtoGLASSVal[TEMPTP];
+
+            TEMPSRC = TPCONFIG[TEMPTP].DGETODM;
+            TEMPDEST = TP_DMtoGLASSVal[TEMPTP];
+
+            sSRC = ITOA(TEMPSRC);
+            sDEST = ITOA(TEMPDEST);
+
+            MAKESTRING(TEMPCMD, "VIDRTE:%s:%s.", sSRC, sDEST);
+            routerCommandTX = TEMPCMD;
+		}        
+        
+		DELAY(20);
+	}
+
+	FOR (TEMPDEST = 1 TO SYS.DMSIZE){
+		DESTINATION[TEMPDEST].USE = OutputEnable[TEMPDEST];
+	}
+
+    sSIGNAGE = ITOA(RM_SIGNAGEVAL);
+    MAKESTRING(TEMPCMD, "CONFIG:SIGNAGE:%s.", sSIGNAGE);
+    routerCommandTX = TEMPCMD;
+
+	RMStartStop(STOP);
+
+    ENABLE = TRUE;
+
+	TRACE("\n");
+	TRACE("// $ // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
+	TRACE("// $ //                  GOD BLESS AMERICA\n");
+    TRACE("// $ //           IPATTFOTUSOAATTRFWISONUGIWLAJFA\n");
+    TRACE("// $ // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
+    TRACE("\n");
+
+	PULSE(50, QUACK);			// THIS IS A REAL FUNCTION. USE IT TO INITIALIZE STEPS OUTSIDE OF THE ASD CONTROLLER. QUACK QUACK
+}
+
+// -- END SECTION  --------------------------------------------------------------------------------------------------------------------- //
+
+// -- EVENT HANDLERS ------------------------------------------------------------------------------------------------------------------- //
+
+// ROOM COMMAND RX
+CHANGE routerCommandRX{
+	INTEGER POS;
+	INTEGER CMDCOUNT;
+	INTEGER LENGTH;
+	INTEGER POSEND;
+	INTEGER CMDVAR[8];
+	INTEGER DONE;
+	STRING TRASH[100];
+	STRING CMDSTR[8][20];
+	STRING CMD[100];
+
+	CMD = routerCommandRX;
+	CMDCOUNT = 0;
+	
+	DO {
+		POS = FIND(":", CMD);
+		IF (POS){
+			CMDCOUNT = CMDCOUNT + 1;
+			LENGTH = POS - 1;
+
+			CMDSTR[CMDCOUNT] = REMOVEBYLENGTH(LENGTH, CMD);
+			TRASH = REMOVEBYLENGTH(1, CMD);			
+		}
+		ELSE {
+			POSEND = FIND(".", CMD);
+			IF (POSEND){
+				CMDCOUNT = CMDCOUNT + 1;
+				LENGTH = POSEND - 1;
+				CMDSTR[CMDCOUNT] = REMOVEBYLENGTH(LENGTH, CMD);
+			}
+			DONE = TRUE;
+		}
+	}
+	UNTIL (DONE = TRUE);
+
+	IF (CMDSTR[1] = "RTEUPDATE"){
+        IF (CMDSTR[2] = "VID"){
+            CMDVAR[3] = ATOI(CMDSTR[3]);
+            CMDVAR[4] = ATOI(CMDSTR[4]);
+            VIDRoute(CMDVAR[4], CMDVAR[3], 0, 1);
+        }
+	}
+}
+
+// ENCLAVE CHANGE
+CHANGE RM_Enclave{
+    INTEGER TEMPNE;
+
+    TEMPNE = RM_Enclave;
+
+    IF ((TEMPNE > 0) && (TEMPNE <= numENCLAVES) && (TEMPNE != ROOM.ENCLAVE)){
+        ENCChange(TEMPNE);
+    }
+}
+// STARTUP SHUTDOWN
+PUSH RM_Startup{
+	RMStartStop(START);
+}
+PUSH RM_Shutdown{
+	RMStartStop(STOP);
+}
+// PRESETS
+PUSH TP_PresetStore{
+	INTEGER TEMPTP;
+
+	TEMPTP = GETLASTMODIFIEDARRAYINDEX();
+
+	IF (RMPRESETSTORETOG = FALSE){
+		RMPRESETTOG = TRUE;
+		RMPRESETSTORETOG = TRUE;
+		TP_StorePresetFB[TEMPTP] = TRUE;
+	}
+}
+CHANGE TP_PresetRecall{
+    INTEGER TEMPTP;
+    INTEGER TEMPPI;
+
+    TEMPTP = GETLASTMODIFIEDARRAYINDEX();
+    TEMPPI = TP_PresetRecall[TEMPTP];
+
+    IF((TEMPPI > 0) && (TEMPPI <= sumPRESETS)){
+        PRESETINDEX = TEMPPI;
+        RECPreset(PRESETINDEX, TEMPTP);
+    } 
+}
+PUSH TP_PresetSavePress{
+    INTEGER TEMPTP;
+
+    TEMPTP = GETLASTMODIFIEDARRAYINDEX();
+	TP_StorePresetFB[TEMPTP] = FALSE;
+
+    IF (RMPRESETSTORETOG = TRUE){
+        PSTRUCT[PRESETINDEX].sNAME = RM_PresetKeyboardINtxt;
+        PresetNameTXT[PRESETINDEX] = PSTRUCT[PRESETINDEX].sNAME;
+
+		PULSE(50, TP_PresetsKeyboardOFF[TEMPTP]);
+		RMPRESETSTORETOG = FALSE;
+		RMPRESETTOG = FALSE;
+		STRPreset(TEMPTP);
+	}
+}
+PUSH TP_PresetCancelPress{
+    INTEGER TEMPTP;
+
+    TEMPTP = GETLASTMODIFIEDARRAYINDEX();
+	TP_StorePresetFB[TEMPTP] = FALSE;
+
+	PULSE(20, TP_PresetsKeyboardOFF[TEMPTP]);	
+
+	RMPRESETSTORETOG = FALSE;
+	RMPRESETTOG = FALSE;
+}
+// DESTINATION PRESS
+PUSH TP_DestinationPress{
+    INTEGER TEMPTP;						// TEMP VARIABLE TO GET TP INFORMATION THAT IN TURN GETS ROOM INFORMATION
+    INTEGER TEMPSRC;					// TEMP VARIABLE TO FIND THE SOURCE THAT THE TP HAS SELECTED TO ROUTE
+	INTEGER TEMPDEST;					// TEMP VARIABLE TO FIND THE DESTINATION THAT THE TP WANTS TO ROUTE TO
+	INTEGER TEMPAUD;					// TEMP VARIABLE TO FIND THE AUDIO ROUTED TO THE CURRENT ROOM
+
+    TEMPTP = GETLASTMODIFIEDARRAYINDEX();					// EVALUATE WHICH TP CHANGED TP_DestinationPress 
+
+	TEMPAUD = ROOM.AUDSOURCE;						// EVALUATE THE CURRENT AUDIO ROUTED IN THE ROOM
+    TEMPSRC = TP_SelectedSource[TEMPTP];					// EVALUATE THE SOURCE THE TP SELECTED
+	TEMPDEST = TP_SelectedDestination[TEMPTP];				// EVALUATE THE DESTINATION THE TP SELECTED
+
+    IF (TEMPSRC = 0){
+        IF (TEMPAUD = DESTINATION[TEMPDEST].SOURCE){
+            VIDRoute(TEMPSRC, TEMPDEST, AUDRouteCLEAR, 0);
+        }
+        ELSE{
+            VIDRoute(TEMPSRC, TEMPDEST, AUDRouteDNR, 0);
+        }
+    }
+    ELSE IF (((TEMPSRC > 0) && (TEMPSRC <= SYS.DMSIZE)) && ((TEMPDEST > 0) && (TEMPDEST <= SYS.DMSIZE))) {
+        IF (AFollowS[TEMPSRC] = TRUE){
+            VIDRoute(TEMPSRC, TEMPDEST, AUDRouteNORMAL, 0);
+        }
+        ELSE IF (AFollowS[TEMPSRC] = FALSE){
+            VIDRoute(TEMPSRC, TEMPDEST, AUDRouteDNR, 0);
+        }
+    }
+}
+PUSH TP_ProgramAudioPress{
+    INTEGER TEMPTP;						// TEMP VARIABLE TO GET TP INFORMATION THAT IN TURN GETS ROOM INFORMATION
+	INTEGER TEMPSRC;					// TEMP VARIABLE TO FIND THE SOURCE THAT THE TP HAS SELECTED TO ROUTE
+	INTEGER RA;
+
+    TEMPTP = GETLASTMODIFIEDARRAYINDEX();
+	TEMPSRC = TP_SelectedSource[TEMPTP];					// EVALUATE THE SOURCE THE TP SELECTED
+
+	IF(TEMPSRC <= 0){
+		RA = AUDRouteCLEAR;
+		TEMPSRC = RM_SIGNAGEVAL;
+	}
+	ELSE{
+		RA = AUDRouteONLY;
+	}
+	AUDConfig(TEMPSRC, VIDRouteDNR, RA, 0);
+}
+// SANITIZE RESTORE PRESS
+PUSH RM_Sanitize{
+    SANIConfig(START);
+}
+PUSH RM_Restore{
+    SANIConfig(STOP);
+}
+// PREVIEW
+PUSH TP_DestinationPreviewEnable{
+	INTEGER TEMPTP;
+	INTEGER TEMPDEST;
+	INTEGER TEMPSRC;
+	INTEGER TEMPDMOUT;
+    STRING TEMPCMD[100];
+    STRING sSOURCE[4];
+    STRING sDEST[4];
+
+	TEMPTP = GETLASTMODIFIEDARRAYINDEX();
+	TEMPDEST = TP_SelectedDestination[TEMPTP];
+	TEMPSRC = DESTINATION[TEMPDEST].SOURCE;
+	TEMPDMOUT = TPCONFIG[TEMPTP].DMTODGE;
+
+	IF (TPDPSTATE[TEMPTP] = FALSE){
+		IF (TPCONFIG[TEMPTP].PREVIEWALLOW = TRUE){
+            TPDPSTATE[TEMPTP] = TRUE;
+            PULSE(020, TP_DestinationPreviewActive[TEMPTP]);
+
+            sSOURCE = ITOA(TEMPSRC);
+            sDEST = ITOA(TEMPDMOUT);
+            MAKESTRING(TEMPCMD, "VIDRTE:%s:%s.\n", sSOURCE, sDEST);
+            routerCommandTX = TEMPCMD;            
+		}
+	}
+	ELSE IF (TPDPSTATE[TEMPTP] = TRUE){
+		ERRORREPORT(9);
+
+		TPDPSTATE[TEMPTP] = FALSE;
+		PULSE(020, TP_DestinationPreviewInactive[TEMPTP]);
+	}
+}
+PUSH TP_DestinationPreviewDisable{
+	INTEGER TEMPTP;
+	INTEGER TEMPSRC;
+	INTEGER TEMPDEST;
+
+	TEMPTP = GETLASTMODIFIEDARRAYINDEX();
+
+	IF (TPDPSTATE[TEMPTP] = TRUE){
+		TPDPSTATE[TEMPTP] = FALSE;
+		PULSE(020, TP_DestinationPreviewInactive[TEMPTP]);
+	}
+}
+PUSH TP_SourcePreviewEnable{
+	INTEGER TEMPTP;
+	INTEGER TEMPSRC;
+	INTEGER TEMPDMOUT;
+	STRING 	sSOURCE[4];
+	STRING	sDEST[4];
+	STRING	TEMPCMD[100];
+
+	TEMPTP = GETLASTMODIFIEDARRAYINDEX();
+	TEMPSRC = TP_SelectedSource[TEMPTP];
+	TEMPDMOUT = TPCONFIG[TEMPTP].DMTODGE;
+
+	IF (TPSPSTATE[TEMPTP] = FALSE){
+		IF (TPCONFIG[TEMPTP].PREVIEWALLOW = TRUE){
+			TPSPSTATE[TEMPTP] = TRUE;
+			PULSE(020, TP_SourcePreviewActive[TEMPTP]);
+
+            sSOURCE = ITOA(TEMPSRC);
+            sDEST = ITOA(TEMPDMOUT);
+            MAKESTRING(TEMPCMD, "VIDRTE:%s:%s.", sSOURCE, sDEST);
+            routerCommandTX = TEMPCMD;  
+		}
+	}
+	ELSE IF (TPSPSTATE[TEMPTP] = TRUE){
+		ERRORREPORT(10);
+		TPSPSTATE[TEMPTP] = FALSE;
+		PULSE(020, TP_SourcePreviewInactive[TEMPTP]);
+	}
+}
+PUSH TP_SourcePreviewDisable{
+	INTEGER TEMPTP;
+
+	TEMPTP = GETLASTMODIFIEDARRAYINDEX();
+
+	IF (TPSPSTATE[TEMPTP] = TRUE){
+		TPSPSTATE[TEMPTP] = FALSE;
+		PULSE(020, TP_SourcePreviewInactive[TEMPTP]);
+	}
+}
+// EXTERNAL SOURCE ROUTING
+CHANGE SETPAUDSOURCEVAL{
+	INTEGER TEMPSRC;
+
+    IF(ENABLE = TRUE){
+        TEMPSRC = SETPAUDSOURCEVAL;
+        AUDRoute(TEMPSRC, INSourceTXT[TEMPSRC], 0);
+    }
+}
+CHANGE DESTSOURCEVALREP{
+	INTEGER TEMPDEST;
+	INTEGER TEMPSRC;
+
+    IF(ENABLE = TRUE){
+        TEMPDEST = GETLASTMODIFIEDARRAYINDEX();
+        TEMPSRC = DESTSOURCEVALREP[TEMPDEST];
+
+        DESTINATION[TEMPDEST].SOURCE = TEMPSRC;
+    }
+}
+PUSH BUILD{
+    storeDefaults();
+}
+
+// -- END SECTION  --------------------------------------------------------------------------------------------------------------------- //
+
+// -- MAIN ----------------------------------------------------------------------------------------------------------------------------- //
+
+FUNCTION Main(){
+    INTEGER TEMPDEST;
+    
+    ENABLE = FALSE;
+
+    WaitForInitializationComplete();
+
+    FOR (TEMPDEST = 1 TO maxIO){
+		DESTINATION[TEMPDEST].ISGLASS = FALSE;
+    }
+	DELAY(600);
+}

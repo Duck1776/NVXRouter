@@ -1,0 +1,361 @@
+//     __
+//   <(o )___
+//    ( ._> /
+//     `---' 
+//      1776
+//
+// -- CODE INFORMATION ------------------------------------------------------------------------------------------- //
+//
+//	PROGRAMMER:			JGonzo
+//
+// -- END SECTION ------------------------------------------------------------------------------------------------ //
+
+// -- COMPILER DIRECTIVES ---------------------------------------------------------------------------------------- //
+
+#ENABLE_DYNAMIC
+#DEFAULT_NONVOLATILE
+#ENABLE_STACK_CHECKING
+#LARGE_STACK
+#ENABLE_TRACE
+#CATEGORY "46" "SIMPL+ ASD Cross Control" // CUSTOM
+// -- END SECTION ------------------------------------------------------------------------------------------------ //
+
+// -- CONSTANTS -------------------------------------------------------------------------------------------------- //
+#DEFINE_CONSTANT    numROOMS 8
+#DEFINE_CONSTANT    maxIO 550
+#DEFINE_CONSTANT    sumPRESETS 192
+
+#DEFINE_CONSTANT	TRUE 1
+#DEFINE_CONSTANT	FALSE 0
+#DEFINE_CONSTANT	START 1
+#DEFINE_CONSTANT	STOP 0
+
+#DEFINE_CONSTANT	AUDUpdate 201
+#DEFINE_CONSTANT	VIDUpdate 301
+
+
+// -- END SECTION ------------------------------------------------------------------------------------------------ //
+// -- DIGITAL / ANALOG / SERIAL I/O ------------------------------------------------------------------------------ //
+      
+// NO ARRAY
+//DIGITAL_INPUT
+ANALOG_INPUT	SetSwitchSize;
+//STRING_INPUT
+  
+//DIGITAL_OUTPUT
+//ANALOG_OUTPUT
+//STRING_OUTPUT
+
+// ARRAY
+DIGITAL_INPUT	SanitizeOutput[maxIO];
+ANALOG_INPUT	OutputRoomAssign[maxIO];
+STRING_INPUT	roomCommandRX[numROOMS][255];
+            
+DIGITAL_OUTPUT	DisplayBlank_TRUE[numROOMS],
+				DisplayBlank_FALSE[numROOMS];
+ANALOG_OUTPUT	RM_PAudOUT[numROOMS],
+				OUTSourceVal[maxIO];
+STRING_OUTPUT	roomCommandTX[numROOMS];
+
+// -- END SECTION  --------------------------------------------------------------------------------------------------------------------- //
+
+// -- GLOBAL VARIABLES ----------------------------------------------------------------------------------------------------------------- //
+SIGNED_INTEGER nFileHandle;
+SIGNED_INTEGER nTotalBytesWritten;
+// -- END SECTION  --------------------------------------------------------------------------------------------------------------------- //
+
+// -- STRUCTURES ----------------------------------------------------------------------------------------------------------------------- //
+STRUCTURE roomStruct{
+	INTEGER SIGNAGESOURCE;
+    INTEGER AUDSOURCE;
+};
+roomStruct ROOM[9];
+
+STRUCTURE destinationStruct{
+	INTEGER ROOMASSIGN;
+	INTEGER SOURCE;
+	INTEGER SANI;
+};
+destinationStruct DESTINATION[550];
+
+STRUCTURE presetsStruct{
+    STRING sMATRIX[550][4];
+	STRING sAUD[4];
+};
+presetsStruct PSTRUCT[192];
+
+STRUCTURE systemStruct{
+	INTEGER DMSIZE;
+};
+systemStruct SYS;
+// -- END SECTION  --------------------------------------------------------------------------------------------------------------------- //
+
+// -- FUNCTIONS ------------------------------------------------------------------------------------------------------------------------ //
+FUNCTION ROUTEUpdate(INTEGER FNM, INTEGER FNDEST, INTEGER FNSRC){
+	INTEGER X;
+	STRING	TEMPCOMMAND[255];
+
+	IF (FNM = VIDUpdate){
+		MAKESTRING(TEMPCOMMAND, "RTEUPDATE:VID:%d:%d.", FNDEST, FNSRC);
+		FOR (X = 1 TO numROOMS){
+			roomCommandTX[X] = TEMPCOMMAND;
+		}
+	}
+}
+
+FUNCTION AUDRoute(INTEGER FNRM, INTEGER FNSRC){
+	TRACE(">>>>> ROUTE     AUDIO | IN: %d - ROOM: %d\n", FNSRC, FNRM);
+
+	RM_PAudOUT[FNRM] = FNSRC;
+    ROOM[FNRM].AUDSOURCE = FNSRC;
+
+	ROUTEUpdate(AUDUpdate, 0, FNSRC);
+}
+
+FUNCTION VIDRoute(INTEGER FNSRC, INTEGER FNDEST){
+	TRACE(">>>>> ROUTE     VIDEO | IN: %d - OUT: %d\n", FNSRC, FNDEST);
+
+	OUTSourceVal[FNDEST] = FNSRC;
+	DESTINATION[FNDEST].SOURCE = FNSRC;
+
+	ROUTEUpdate(VIDUpdate, FNDEST, FNSRC);
+}
+
+FUNCTION SANIConfig(INTEGER FNRM, INTEGER FNMODE){
+	INTEGER TEMPDEST;
+
+	IF (FNMODE = START){
+		TRACE(">>>>> SANITIZE        | ROOM: %d\n", FNRM);
+		PULSE(200, DisplayBlank_TRUE[FNRM]);
+		FOR (TEMPDEST = 1 TO SYS.DMSIZE){
+			IF ((DESTINATION[TEMPDEST].SANI = TRUE) && (DESTINATION[TEMPDEST].ROOMASSIGN = FNRM)) {
+				
+				OUTSourceVal[TEMPDEST] = ROOM[FNRM].SIGNAGESOURCE;
+			}
+		}
+		PULSE(200, DisplayBlank_FALSE[FNRM]);
+	}
+	ELSE IF (FNMODE = STOP){
+		TRACE(">>>>> RESTORE         | ROOM: %d\n", FNRM);
+		PULSE(200, DisplayBlank_TRUE[FNRM]);
+		FOR (TEMPDEST = 1 TO SYS.DMSIZE){
+			IF ((DESTINATION[TEMPDEST].SANI = TRUE) && (DESTINATION[TEMPDEST].ROOMASSIGN = FNRM)) {
+				
+				OUTSourceVal[TEMPDEST] = DESTINATION[TEMPDEST].SOURCE;
+			}
+		}
+		PULSE(200, DisplayBlank_FALSE[FNRM]);
+	}
+}
+FUNCTION STRPreset(INTEGER FNRM, INTEGER FNPI){
+	INTEGER TEMPDEST;
+	INTEGER TEMPSRC;
+	INTEGER TEMPPMX;
+	INTEGER TEMPX;
+	INTEGER FAIL;
+	INTEGER PASS;
+    INTEGER TOTALBYTES;
+	STRING sTEMPMATRIX[14];
+	STRING sTEMPSRC[14];
+
+	TRACE(">>>>> PRESET    STORE | ROOM: %d - INDEX: %d\n", FNRM, FNPI);
+
+	TEMPSRC = ROOM[FNRM].AUDSOURCE;
+
+	sTEMPSRC = ITOA(TEMPSRC);
+    PSTRUCT[FNPI].sAUD = sTEMPSRC;
+
+	FOR (TEMPDEST = 1 TO SYS.DMSIZE){
+		IF ((DESTINATION[TEMPDEST].SANI = TRUE) && (DESTINATION[TEMPDEST].ROOMASSIGN = FNRM)){
+			TEMPSRC = DESTINATION[TEMPDEST].SOURCE;
+			TEMPPMX = 0;
+            IF ((TEMPSRC >= 1) && (TEMPSRC <= SYS.DMSIZE)){
+				TEMPPMX = TEMPSRC;
+			}
+            sTEMPMATRIX = ITOA(TEMPPMX);
+            PSTRUCT[FNPI].sMATRIX[TEMPDEST] = sTEMPMATRIX;		
+		}
+	}
+
+	FAIL = 0;
+	PASS = 0;
+    TOTALBYTES = 0;
+
+	STARTFILEOPERATIONS();
+    nFileHandle = FileOpen("\\FILES\\Presets.bin", _o_WRONLY | _O_BINARY | _O_CREAT);
+    IF (nFileHandle >= 0){
+		FOR(TEMPX = 1 TO 24){
+	        WRITESTRUCTURE(nFileHandle, PSTRUCT[TEMPX], nTotalBytesWritten);
+	        IF(nTotalBytesWritten < 0){
+				FAIL = FAIL + 1;
+			}	
+	        ELSE{
+				PASS = PASS + 1;
+			}
+			nTotalBytesWritten = nTotalBytesWritten / 1024;
+            TOTALBYTES = TOTALBYTES + nTotalBytesWritten;
+		}
+    }
+	FileClose(nFileHandle);
+    ENDFILEOPERATIONS();
+}
+FUNCTION RECPreset(INTEGER FNRM, INTEGER FNPI){
+	INTEGER TEMPDEST;
+    INTEGER TEMPSRC;
+
+	TRACE(">>>>> PRESET   RECALL | ROOM: %d - INDEX: %d\n", FNRM, FNPI);
+
+	RM_PAudOUT[FNRM] = ATOI(PSTRUCT[FNPI].sAUD);
+			
+	FOR (TEMPDEST = 1 TO SYS.DMSIZE){
+		IF ((DESTINATION[TEMPDEST].SANI = TRUE) && (DESTINATION[TEMPDEST].ROOMASSIGN = FNRM)){
+			TEMPSRC = ATOI(PSTRUCT[FNPI].sMATRIX[TEMPDEST]);
+			
+			OUTSourceVal[TEMPDEST] = TEMPSRC;
+			DESTINATION[TEMPDEST].SOURCE = TEMPSRC;
+
+			ROUTEUpdate(VIDUpdate, TEMPDEST, TEMPSRC);
+		}
+	}
+}
+FUNCTION RMStartStop(INTEGER FNRM){
+	INTEGER TEMPDEST;
+
+	TRACE(">>>>> RMStartStop     | ROOM: %d\n", FNRM);
+
+	RM_PAudOUT[FNRM] = ROOM[FNRM].SIGNAGESOURCE;
+
+	FOR (TEMPDEST = 1 TO SYS.DMSIZE){
+        IF ((DESTINATION[TEMPDEST].SANI = TRUE) && (DESTINATION[TEMPDEST].ROOMASSIGN = FNRM)){
+            OUTSourceVal[TEMPDEST] = ROOM[FNRM].SIGNAGESOURCE;
+        }
+	}
+}
+FUNCTION storeDefaults(){
+	INTEGER TEMPDEST;
+	INTEGER TEMPX;
+    INTEGER FAIL;
+	INTEGER PASS;
+    INTEGER TOTALBYTES;  
+	INTEGER nTotalBytesRead;
+
+    FAIL = 0;
+	PASS = 0;
+    TOTALBYTES = 0;
+
+    STARTFILEOPERATIONS();
+    nFileHandle = FileOpen("\\FILES\\Presets.bin", _o_RDONLY | _O_BINARY );
+
+    IF (nFileHandle >= 0){
+        FOR(TEMPX = 1 TO sumPRESETS){
+            READSTRUCTURE(nFileHandle, PSTRUCT[TEMPX], nTotalBytesRead);
+            IF(nTotalBytesRead < 0){
+				FAIL = FAIL + 1;
+			}	
+	        ELSE{
+				PASS = PASS + 1;
+			}
+			nTotalBytesRead = nTotalBytesRead / 1024;
+            TOTALBYTES = TOTALBYTES + nTotalBytesRead;
+		}
+    }
+    FileClose(nFileHandle);
+    ENDFILEOPERATIONS();
+
+    SYS.DMSIZE = SetSwitchSize;
+
+	FOR (TEMPDEST = 1 TO SYS.DMSIZE){
+		DESTINATION[TEMPDEST].ROOMASSIGN = OutputRoomAssign[TEMPDEST];
+		DESTINATION[TEMPDEST].SANI = SanitizeOutput[TEMPDEST];
+	}
+
+	TRACE("\n");
+	TRACE("// $ // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
+	TRACE("// $ //                  GOD BLESS AMERICA\n");
+    TRACE("// $ //           IPATTFOTUSOAATTRFWISONUGIWLAJFA\n");
+    TRACE("// $ // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
+    TRACE("\n");
+}
+// -- END SECTION  --------------------------------------------------------------------------------------------------------------------- //
+
+// -- EVENT HANDLERS ------------------------------------------------------------------------------------------------------------------- //
+CHANGE roomCommandRX{
+	INTEGER	TEMPRM;
+	INTEGER POS;
+	INTEGER CMDCOUNT;
+	INTEGER LENGTH;
+	INTEGER POSEND;
+	INTEGER CMDVAR[8];
+	INTEGER DONE;
+	STRING TRASH[100];
+	STRING CMDSTR[8][20];
+	STRING CMD[100];
+
+	TEMPRM = GETLASTMODIFIEDARRAYINDEX();
+
+	TRACE("<<<<<<<<<< roomCommandRX %s\n", roomCommandRX[TEMPRM]);
+
+	CMD = roomCommandRX[TEMPRM];
+
+	CMDCOUNT = 0;
+	
+	DO {
+		POS = FIND(":", CMD);
+		IF (POS){
+			CMDCOUNT = CMDCOUNT + 1;
+			LENGTH = POS - 1;
+
+			CMDSTR[CMDCOUNT] = REMOVEBYLENGTH(LENGTH, CMD);
+			TRASH = REMOVEBYLENGTH(1, CMD);			
+		}
+		ELSE {
+			POSEND = FIND(".", CMD);
+			IF (POSEND){
+				CMDCOUNT = CMDCOUNT + 1;
+				LENGTH = POSEND - 1;
+				CMDSTR[CMDCOUNT] = REMOVEBYLENGTH(LENGTH, CMD);
+			}
+			DONE = TRUE;
+		}
+	}
+	UNTIL (DONE = TRUE);
+
+	IF (CMDSTR[1] = "AUDRTE"){
+		CMDVAR[2] = ATOI(CMDSTR[2]);
+		AUDRoute(TEMPRM, CMDVAR[2]);
+	}
+	ELSE IF (CMDSTR[1] = "VIDRTE"){
+		CMDVAR[2] = ATOI(CMDSTR[2]);
+		CMDVAR[3] = ATOI(CMDSTR[3]);
+		VIDRoute(CMDVAR[2], CMDVAR[3]);
+	}
+	ELSE IF (CMDSTR[1] = "SANI"){
+		CMDVAR[2] = ATOI(CMDSTR[2]);
+		SANIConfig(TEMPRM, CMDVAR[2]);
+	}
+	ELSE IF (CMDSTR[1] = "PRESET"){
+		IF (CMDSTR[2] = "SAVE"){
+			CMDVAR[3] = ATOI(CMDSTR[3]);
+			STRPreset(TEMPRM, CMDVAR[3]);
+		}
+		ELSE IF (CMDSTR[2] = "RECALL"){
+			CMDVAR[3] = ATOI(CMDSTR[3]);
+			RECPreset(TEMPRM, CMDVAR[3]);
+		}
+	}
+	ELSE IF (CMDSTR[1] = "STARTSTOP"){
+		RMStartStop(TEMPRM);
+	}
+	ELSE IF (CMDSTR[1] = "CONFIG"){
+		IF (CMDSTR[2] = "SIGNAGE"){
+			CMDVAR[3] = ATOI(CMDSTR[3]);
+			ROOM[TEMPRM].SIGNAGESOURCE = CMDVAR[3];
+		}
+	}
+}
+// -- END SECTION  --------------------------------------------------------------------------------------------------------------------- //
+
+// -- MAIN ----------------------------------------------------------------------------------------------------------------------------- //
+FUNCTION Main(){
+	storeDefaults();
+}
