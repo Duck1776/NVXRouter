@@ -22,7 +22,7 @@
 //	PROGRAMMER:			JGonzo
 //	RELEASE DATE:		
 //	RELEASE VERSION:	
-//  MODULE DEFINITION:	
+//      MODULE DEFINITION:	
 //
 // -- END SECTION ------------------------------------------------------------------------------------------------ //
 
@@ -46,23 +46,23 @@
 
 // -- CONSTANTS -------------------------------------------------------------------------------------------------- //
 
-#DEFINE_CONSTANT    numTOUCHPANELS 10
-#DEFINE_CONSTANT    numENCLAVES 3
-#DEFINE_CONSTANT    maxIO 550
-#DEFINE_CONSTANT    sumPRESETS 24
-#DEFINE_CONSTANT    numPRESETPARAMS 10
+#DEFINE_CONSTANT	numTOUCHPANELS 10
+#DEFINE_CONSTANT	numENCLAVES 3
+#DEFINE_CONSTANT	maxIO 550
+#DEFINE_CONSTANT	sumPRESETS 24
+#DEFINE_CONSTANT	numPRESETPARAMS 10
 
 #DEFINE_CONSTANT	TRUE 1
 #DEFINE_CONSTANT	FALSE 0
 #DEFINE_CONSTANT	START 1
 #DEFINE_CONSTANT	STOP 0
 
-#DEFINE_CONSTANT    AUDRouteNORMAL 1111
-#DEFINE_CONSTANT    AUDRouteONLY 2222
-#DEFINE_CONSTANT    AUDRouteCLEAR 3333
-#DEFINE_CONSTANT    AUDRouteREMOVE 4444
-#DEFINE_CONSTANT    AUDRouteDNR 0
-#DEFINE_CONSTANT    VIDRouteDNR 8888
+#DEFINE_CONSTANT	AUDRouteNORMAL 1111
+#DEFINE_CONSTANT	AUDRouteONLY 2222
+#DEFINE_CONSTANT	AUDRouteCLEAR 3333
+#DEFINE_CONSTANT	AUDRouteREMOVE 4444
+#DEFINE_CONSTANT	AUDRouteDNR 0
+#DEFINE_CONSTANT	VIDRouteDNR 8888
 
 // -- END SECTION ------------------------------------------------------------------------------------------------ //
 // -- DIGITAL / ANALOG / SERIAL I/O ------------------------------------------------------------------------------ //
@@ -95,7 +95,7 @@ ANALOG_OUTPUT   RM_Enclave_FB, _SKIP_;
 
 STRING_OUTPUT   RM_PAudOutText$, _SKIP_,						// ROOM PROGRAM AUDIO TEXT
                 RM_PresetNameCurrentTXT, _SKIP_,
-				ERRORTXT, _SKIP_,
+		ERRORTXT, _SKIP_,
                 routerCommandTX, _SKIP_;
 
 //ARRAYS
@@ -105,33 +105,33 @@ DIGITAL_INPUT   TP_PresetStore[numTOUCHPANELS], _SKIP_,
                 TP_DestinationPress[numTOUCHPANELS], _SKIP_, 
                 TP_ProgramAudioPress[numTOUCHPANELS], _SKIP_,
                 TP_DestinationPreviewEnable[numTOUCHPANELS], _SKIP_,
-				TP_DestinationPreviewDisable[numTOUCHPANELS], _SKIP_,
+		TP_DestinationPreviewDisable[numTOUCHPANELS], _SKIP_,
                 TP_SourcePreviewEnable[numTOUCHPANELS], _SKIP_,
-				TP_SourcePreviewDisable[numTOUCHPANELS], _SKIP_,
+		TP_SourcePreviewDisable[numTOUCHPANELS], _SKIP_,
                 AFollowV[maxIO], _SKIP_,
-				AFollowS[maxIO], _SKIP_,
+		AFollowS[maxIO], _SKIP_,
                 OutputEnable[maxIO], _SKIP_;
 
 ANALOG_INPUT	TP_PresetRecall[numTOUCHPANELS], _SKIP_,
                 TP_SelectedDestination[numTOUCHPANELS], _SKIP_,
-				TP_SelectedSource[numTOUCHPANELS], _SKIP_,
-				TP_DGEtoDMVal[numTOUCHPANELS], _SKIP_,				// TP DGE OUTPUT TO DM INPUT
-				TP_DMtoDGEVal[numTOUCHPANELS], _SKIP_,				// TP DM OUTPUT TO DGE INPUT
-				TP_DMtoGLASSVal[numTOUCHPANELS], _SKIP_,				// DM OUTPUT THAT CONNECTS TO THE GLASS THAT SHOWS  DGE
-				TPPanelType[numTOUCHPANELS], _SKIP_,
-				DESTSOURCEVALREP[maxIO], _SKIP_,
-				PresetParamIN[numPRESETPARAMS], _SKIP_;
+		TP_SelectedSource[numTOUCHPANELS], _SKIP_,
+		TP_DGEtoDMVal[numTOUCHPANELS], _SKIP_,				// TP DGE OUTPUT TO DM INPUT
+		TP_DMtoDGEVal[numTOUCHPANELS], _SKIP_,				// TP DM OUTPUT TO DGE INPUT
+		TP_DMtoGLASSVal[numTOUCHPANELS], _SKIP_,				// DM OUTPUT THAT CONNECTS TO THE GLASS THAT SHOWS  DGE
+		TPPanelType[numTOUCHPANELS], _SKIP_,
+		DESTSOURCEVALREP[maxIO], _SKIP_,
+		PresetParamIN[numPRESETPARAMS], _SKIP_;
 
 STRING_INPUT    INSourceTXT[maxIO][100], _SKIP_;
 
 DIGITAL_OUTPUT	TP_StorePresetFB[numTOUCHPANELS], _SKIP_,
                 TP_PresetsKeyboardON[numTOUCHPANELS], _SKIP_,
-				TP_PresetsKeyboardOFF[numTOUCHPANELS], _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_,
+		TP_PresetsKeyboardOFF[numTOUCHPANELS], _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_,
                 TP_PreviewAllowed_fb[numTOUCHPANELS], _SKIP_,
                 TP_DestinationPreviewActive[numTOUCHPANELS], _skip_,
-				TP_DestinationPreviewInactive[numTOUCHPANELS], _SKIP_,
+		TP_DestinationPreviewInactive[numTOUCHPANELS], _SKIP_,
                 TP_SourcePreviewActive[numTOUCHPANELS], _SKIP_,
-				TP_SourcePreviewInactive[numTOUCHPANELS], _SKIP_;
+		TP_SourcePreviewInactive[numTOUCHPANELS], _SKIP_;
 
 ANALOG_OUTPUT   PresetParamOUT[numPRESETPARAMS], _SKIP_;
 
@@ -159,19 +159,19 @@ SIGNED_INTEGER nTotalBytesWritten;
 STRUCTURE roomStruct{
 	INTEGER ENCLAVE;
 	INTEGER SANITIZE;
-    INTEGER MODE;
-    INTEGER AUDSOURCE;
-    STRING sPAUDSRCTEXT[50];
+	INTEGER MODE;
+	INTEGER AUDSOURCE;
+	STRING sPAUDSRCTEXT[50];
 };
 roomStruct ROOM;
 
 STRUCTURE destinationStruct{
 	INTEGER ROOMASSIGN;
-    INTEGER USE;
+	INTEGER USE;
 	INTEGER SOURCE;
 	INTEGER ISGLASS;
-    INTEGER ISDMTODGE;
-    STRING  SOURCETEXT[50];
+	INTEGER ISDMTODGE;
+	STRING  SOURCETEXT[50];
 };
 destinationStruct DESTINATION[550];
 
@@ -182,16 +182,16 @@ STRUCTURE tpConfigurationStruct{
 	INTEGER DGETODM;
 	INTEGER DMTODGE;
 	INTEGER DMTOGLASS;
-    INTEGER REMANNDEV;
+	INTEGER REMANNDEV;
 };
 tpConfigurationStruct TPCONFIG[10];
 
 STRUCTURE presetsStruct{
-    INTEGER PAUDSRC;
-    INTEGER PMATRIX[550];
+	INTEGER PAUDSRC;
+	INTEGER PMATRIX[550];
 	STRING sNAME[50];
-    STRING sPARAM[11][5];
-    STRING sPAUDTEXT[50];
+	STRING sPARAM[11][5];
+	STRING sPAUDTEXT[50];
 };
 presetsStruct PSTRUCT[24];
 
@@ -218,7 +218,7 @@ FUNCTION ERRORREPORT(INTEGER FNERR){
 			ERRORTXT = "This room is already annotating on another touch panel.";
 		CASE(6):
 			ERRORTXT = "Recalling or saving presets not possible while annotation is active.";
-        CASE(7):
+        	CASE(7):
             ERRORTXT = "You tried to annotate over no source, you cannot annotate a 0 source value.";
 		CASE(8):
 			ERRORTXT = "The Classification of the source is higher than the room the destination is assigned to.";
@@ -226,10 +226,10 @@ FUNCTION ERRORREPORT(INTEGER FNERR){
 			ERRORTXT = "Correcting Detected Error - Destination Preview is already active on this touch panel. Please try again.";
 		CASE(10):
 			ERRORTXT = "Correcting Detected Error - Source Preview is already active on this touch panel. Please try again.";
-        CASE(11):
+		CASE(11):
 			ERRORTXT = "Routing issue regarding the source or the destination. Please try again. If issue persists, contact support.";
-        CASE(12):
-            ERRORTXT = "Source Assignment Error - The assignment logic is set to IDLE. It must be in either ADD or REMOVE to continue.";
+        	CASE(12):
+            		ERRORTXT = "Source Assignment Error - The assignment logic is set to IDLE. It must be in either ADD or REMOVE to continue.";
     }
 	PULSE (300, RMERRORFB);	// MEANT TO PULSE A SPG FOR 3 SECONDS THAT DISPLAYS THE ERROR TEXT
 }
@@ -268,13 +268,12 @@ FUNCTION AUDConfig(INTEGER FNSRC, INTEGER FNDEST, INTEGER FNRA, INTEGER FNUPDATE
 	AUDRoute(FNSRC, TEMPAUDTXT$, FNUPDATE);
 }
 FUNCTION VIDRoute(INTEGER FNSRC, INTEGER FNDEST, INTEGER FNRA, INTEGER FNUPDATE){
-    STRING TEMPCOMMAND[100];
-    STRING sSOURCE[4];
-    STRING sDEST[4];
-
+	STRING TEMPCOMMAND[100];
+	STRING sSOURCE[4];
+	STRING sDEST[4];
 	STRING TEMPSRCTXT$[100];
-    INTEGER TEMPSRC;
-    INTEGER TEMPSRCENC;
+	INTEGER TEMPSRC;
+	INTEGER TEMPSRCENC;
 	INTEGER BOOLNR;
 
 	BOOLNR = FNDEST;
